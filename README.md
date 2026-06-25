@@ -53,7 +53,7 @@ velocityDrop/
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/kasyapmittu/velocity-drop.git
+git clone https://github.com/vadde-kasyap/VelocityDrop
 cd velocity-drop
 ```
 
