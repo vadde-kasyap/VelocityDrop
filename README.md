@@ -255,7 +255,11 @@ Click **Start Swarming**.
 ### What to watch
 
 - **Locust dashboard** — Real-time RPS, latency, and failure rate
+- <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/77054f82-0ecb-4689-b6fb-950390a29ea3" />
+
 - **RabbitMQ dashboard** (http://localhost:15672 → Queues tab) — Watch the queue spike and drain as the worker processes orders
+- <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/d7e3c8c8-8dd9-4dd9-85b2-07830880c99b" />
+
 - **Worker terminal** — See each `✅ SUCCESS` or `❌ FAILED` order log in real time
 
 ---
