@@ -259,6 +259,8 @@ Click **Start Swarming**.
 
 - **RabbitMQ dashboard** (http://localhost:15672 → Queues tab) — Watch the queue spike and drain as the worker processes orders
 - <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/7d50bddc-4c21-4117-b90a-62933f2ef971" />
+<img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/7d3bf39a-ddba-43db-aa1b-b7c37fff2ae9" />
+
 
 
 - **Worker terminal** — See each `✅ SUCCESS` or `❌ FAILED` order log in real time
