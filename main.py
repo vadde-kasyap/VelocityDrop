@@ -121,7 +121,7 @@ async def autocomplete(q: str = Query(..., min_length=1)):
     
     results = search_trie.search_prefix(prefix)
     if results:
-        redis_client.setex(redis_key, 60, json.dumps(results))
+        redis_client.set(redis_key, json.dumps(results), ex=60)
     return {"source": "trie_computation", "results": results}
 
 @app.post("/checkout", status_code=202)

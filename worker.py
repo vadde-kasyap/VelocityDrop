@@ -25,7 +25,7 @@ async def process_message(message: aio_pika.IncomingMessage):
             return
 
         # Lock the Transaction Key in Redis
-        redis_client.setex(redis_idem_key, 86400, "processing")
+        redis_client.set(redis_idem_key, "processing", ex=86400)
 
         db = SessionLocal()
 
@@ -36,7 +36,7 @@ async def process_message(message: aio_pika.IncomingMessage):
 
             if not wallet or not product:
                 print(f"❌ FAILED: User '{user_id}' or Product '{product_name}' not found in database.")
-                redis_client.setex(redis_idem_key, 86400, "failed_invalid_data")
+                redis_client.set(redis_idem_key, "failed_invalid_data", ex=86400)
                 return
 
             total_cost = round(product.price * quantity, 2)
@@ -53,7 +53,7 @@ async def process_message(message: aio_pika.IncomingMessage):
                 )
                 db.add(failed_order)
                 db.commit()
-                redis_client.setex(redis_idem_key, 86400, "failed_funds")
+                redis_client.set(redis_idem_key, "failed_funds", ex=86400)
                 return
 
 # 4. Funds are good. Now hit the high-speed Redis lock with dynamic quantity!
@@ -74,7 +74,7 @@ async def process_message(message: aio_pika.IncomingMessage):
                 db.commit()
                 
                 print(f"✅ SUCCESS: {user_id} bought {quantity} {product_name}(s). Remaining Wallet: ₹{wallet.balance}. Stock left: {stock_remaining}")
-                redis_client.setex(redis_idem_key, 86400, "success")
+                redis_client.set(redis_idem_key, "success", ex=86400)
                 
             else:
                 # 6. OVERDRAW ROLLBACK
@@ -88,7 +88,7 @@ async def process_message(message: aio_pika.IncomingMessage):
                 )
                 db.add(failed_order)
                 db.commit()
-                redis_client.setex(redis_idem_key, 86400, "failed_sold_out")
+                redis_client.set(redis_idem_key, "failed_sold_out", ex=86400)
 
         finally:
             # Always ensure the database connection closes
