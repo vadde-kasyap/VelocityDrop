@@ -21,7 +21,7 @@ To handle high concurrency without database locking or system crashes, this proj
 *   **Relational Database:** PostgreSQL
 *   **Frontend UI:** Next.js, React
 
-## 📈 Performance & Load Testing (Work in Progress)
+## 📈 Performance & Load Testing 
 
 *Benchmarking is currently being conducted using [Locust / K6] to simulate concurrent flash-sale traffic. Metrics will be updated upon test completion.*
 
