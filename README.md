@@ -8,7 +8,7 @@ VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-
 
 ## Architecture
 
-```
+\`\`\`text
 Browser (Next.js)
       │
       ▼
@@ -19,7 +19,7 @@ RabbitMQ Queue
       │
       ▼
 Worker Process  ──► PostgreSQL (products, wallets, orders)
-```
+\`\`\`
 
 | Component | Role |
 |---|---|
@@ -47,7 +47,7 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 
 ## Repository Layout
 
-```
+\`\`\`text
 VelocityDrop/
 ├── main.py                  # FastAPI entry point & startup events
 ├── cache.py                 # Redis connection setup
@@ -65,7 +65,7 @@ VelocityDrop/
     └── src/app/
         ├── page.js          # Storefront (search + checkout)
         └── admin/page.js    # Admin dashboard
-```
+\`\`\`
 
 ---
 
@@ -85,10 +85,10 @@ Make sure you have the following installed before starting:
 
 ### Step 1 — Clone the repository
 
-```bash
+\`\`\`bash
 git clone https://github.com/vadde-kasyap/VelocityDrop.git
 cd VelocityDrop
-```
+\`\`\`
 
 ---
 
@@ -96,15 +96,15 @@ cd VelocityDrop
 
 This starts Redis, RabbitMQ, and PostgreSQL in the background.
 
-```bash
+\`\`\`bash
 docker-compose up -d
-```
+\`\`\`
 
 Verify all three containers are running:
 
-```bash
+\`\`\`bash
 docker ps
-```
+\`\`\`
 
 You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` all with status `Up`.
 
@@ -119,27 +119,27 @@ You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` al
 
 ### Step 3 — Set up the Python environment
 
-```bash
+\`\`\`bash
 python -m venv venv
-```
+\`\`\`
 
 Activate the virtual environment:
 
 **Windows (PowerShell):**
-```powershell
+\`\`\`powershell
 .\venv\Scripts\Activate.ps1
-```
+\`\`\`
 
 **macOS / Linux:**
-```bash
+\`\`\`bash
 source venv/bin/activate
-```
+\`\`\`
 
 Install all dependencies:
 
-```bash
+\`\`\`bash
 pip install -r requirements.txt
-```
+\`\`\`
 
 ---
 
@@ -147,9 +147,9 @@ pip install -r requirements.txt
 
 From the project root (with the venv active):
 
-```bash
+\`\`\`bash
 uvicorn main:app --reload
-```
+\`\`\`
 
 | URL | Description |
 |---|---|
@@ -164,10 +164,10 @@ The first startup automatically creates all database tables in PostgreSQL.
 
 Open a **second terminal**, activate the same venv, and run:
 
-```bash
+\`\`\`bash
 # Windows (forces UTF-8 for Rs symbol and emoji)
 $env:PYTHONUTF8=1; python worker.py --workers 2 --prefetch 5
-```
+\`\`\`
 
 By default, this spawns a **Multi-Process Worker Pool** tuned for a stable "Sweet Spot": 2 isolated processes, each handling up to 5 concurrent orders via RabbitMQ prefetch. This allows the system to comfortably process **10 concurrent orders** simultaneously without overwhelming local database connections or CPU.
 
@@ -179,11 +179,11 @@ The workers listen on the `checkout_queue` RabbitMQ queue, process orders asynch
 
 Open a **third terminal**:
 
-```bash
+\`\`\`bash
 cd velocity-frontend
 npm install
 npm run dev
-```
+\`\`\`
 
 | URL | Description |
 |---|---|
@@ -206,7 +206,7 @@ You must add at least one product and seed wallets before checkout will work.
 
 **Option B — Use the API directly:**
 
-```bash
+\`\`\`bash
 # Add a product
 curl -X POST http://127.0.0.1:8000/admin/product \
   -H "Content-Type: application/json" \
@@ -214,7 +214,7 @@ curl -X POST http://127.0.0.1:8000/admin/product \
 
 # Seed 2000 user wallets with $500–$5000 each
 curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
-```
+\`\`\`
 
 ---
 
@@ -224,23 +224,23 @@ curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount
 
 Open [`locustfile.py`](locustfile.py) and set `target_products` to match a product you added in Step 7:
 
-```python
+\`\`\`python
 target_products = [
     "mac book m4"   # must already exist in the database
 ]
-```
+\`\`\`
 
 ### Run Locust
 
 **Windows (PowerShell — uses the venv directly):**
-```powershell
+\`\`\`powershell
 .\venv\Scripts\locust.exe -f locustfile.py --host=http://127.0.0.1:8000
-```
+\`\`\`
 
 **macOS / Linux (with venv activated):**
-```bash
+\`\`\`bash
 locust -f locustfile.py --host=http://127.0.0.1:8000
-```
+\`\`\`
 
 Open the Locust Web UI at **http://localhost:8089** and enter:
 
@@ -275,32 +275,33 @@ The system is designed to handle thousands of concurrent users seamlessly:
 2. **RabbitMQ Prefetch**: The `--prefetch 5` flag tells each worker to ask RabbitMQ for 5 unacknowledged messages at once.
 3. **Non-blocking DB Calls**: Blocking SQLAlchemy database operations are offloaded to thread pools (`asyncio.to_thread()`), ensuring the main event loop is never blocked while waiting for PostgreSQL.
 4. **Connection Pool Safety**: Tuned to a "Sweet Spot" (2 workers × 5 prefetch = **10 concurrent orders**), ensuring default PostgreSQL connection limits are respected without deadlocks, while still draining a 1000-user queue in ~3 seconds.
+5. **RabbitMQ Channel Pooling**: The API Gateway uses `aio_pika.Pool` to multiplex thousands of concurrent checkout requests across 20 persistent RabbitMQ channels, preventing OS-level socket exhaustion and heartbeat timeouts during massive traffic spikes.
 
 ---
 
 ## API Reference
 
 ### `GET /search?q={prefix}`
-Returns autocomplete suggestions from the in-memory Trie (Redis-cached for 60 s).
+Returns autocomplete suggestions instantly using the stateless Redis Lexicographical Search (`ZRANGEBYLEX`).
 
 ### `POST /checkout`
 Queues a checkout request via RabbitMQ. Returns `202 Accepted` immediately.
-```json
+\`\`\`json
 { "user_id": "user_1", "product_name": "mac book m4", "quantity": 1 }
-```
+\`\`\`
 Include an `Idempotency-Key` header to prevent duplicate orders.
 
 ### `POST /wallet/deposit`
 Credits a user's wallet.
-```json
+\`\`\`json
 { "user_id": "user_1", "amount": 1000 }
-```
+\`\`\`
 
 ### `POST /admin/product`
-Adds a new product to Postgres, Trie, and Redis simultaneously.
-```json
+Adds a new product to Postgres and the Redis Lexicographical Set simultaneously.
+\`\`\`json
 { "name": "iphone 16", "stock": 200, "price": 999.99 }
-```
+\`\`\`
 
 ### `PUT /admin/product/{name}?new_stock={n}`
 Updates stock in Postgres and Redis.
