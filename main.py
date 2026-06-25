@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, Header
+from fastapi import FastAPI, Query, Header, HTTPException
 from pydantic import BaseModel
 import uvicorn
 import redis
@@ -15,7 +15,13 @@ from fastapi.middleware.cors import CORSMiddleware # 1. Make sure this import is
 import random  # or any other top-level imports
 from fastapi import FastAPI, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI
+from database import engine, Base
 
+
+# 1. Automate Database Initialization
+# This line tells SQLAlchemy to build the tables the moment the app starts
+Base.metadata.create_all(bind=engine)
 # 1. Initialize app FIRST
 app = FastAPI(title="VelocityDrop API Gateway")
 
@@ -87,8 +93,9 @@ async def startup_event():
     
     # 3. BUILD TRIE AND REDIS FROM DATABASE DATA
     for p in products:
-        search_trie.insert(p.name)
-        redis_client.set(f"inventory:{p.name}", p.stock)
+        # BUG FIX: always lowercase so prefix search matches lowercased queries
+        search_trie.insert(p.name.lower())
+        redis_client.set(f"inventory:{p.name.lower()}", p.stock)
         
     db.close()
     print("✅ Trie built and Redis inventory seeded directly from PostgreSQL!")
@@ -176,7 +183,7 @@ async def deposit_funds(request: DepositRequest):
     
     return {
         "status": "success",
-        "message": f"Successfully deposited ${request.amount}",
+        "message": f"Successfully deposited ₹{request.amount}",
         "user_id": request.user_id,
         "new_balance": current_balance
     }
@@ -194,7 +201,8 @@ async def add_new_product(product: NewProductRequest):
     existing = db.query(Product).filter(Product.name == product_name_clean).first()
     if existing:
         db.close()
-        return {"error": "Product already exists. Use PUT /admin/product/{name} to update stock."}
+        # BUG FIX: raise HTTP 400 so the frontend can correctly detect this as an error
+        raise HTTPException(status_code=400, detail="Product already exists. Use PUT /admin/product/{name} to update stock.")
         
     # 2. Save to Source of Truth (Postgres)
     new_prod = Product(name=product_name_clean, stock=product.stock, price=product.price)
@@ -205,6 +213,11 @@ async def add_new_product(product: NewProductRequest):
     # 3. Inject into High-Speed Caches (Trie & Redis)
     search_trie.insert(product_name_clean)
     redis_client.set(f"inventory:{product_name_clean}", product.stock)
+    
+    # BUG FIX: Invalidate any stale Redis search-cache entries for every prefix of this
+    # product's name so the next search hits the Trie and returns fresh results immediately.
+    for i in range(1, len(product_name_clean) + 1):
+        redis_client.delete(f"search:{product_name_clean[:i]}")
     
     return {"status": "success", "message": f"Successfully added '{product.name}'."}
 
@@ -217,7 +230,8 @@ async def update_inventory(product_name: str, new_stock: int):
     product = db.query(Product).filter(Product.name == product_name_clean).first()
     if not product:
         db.close()
-        return {"error": "Product not found."}
+        # BUG FIX: raise HTTP 404 so the frontend can correctly detect this as an error
+        raise HTTPException(status_code=404, detail="Product not found.")
         
     # Update Postgres
     product.stock = new_stock
@@ -257,7 +271,7 @@ async def mass_seed_wallets(num_users: int = 2000, min_amount: float = 500.0, ma
     
     return {
         "status": "success", 
-        "message": f"Generated {num_users} new users with random balances between ${min_amount} and ${max_amount}."
+        "message": f"Generated {num_users} new users with random balances between ₹{min_amount} and ₹{max_amount}."
     }
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

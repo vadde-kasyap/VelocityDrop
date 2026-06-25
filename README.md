@@ -2,127 +2,173 @@
 
 **High-concurrency flash-sale and distributed checkout engine.**
 
-VelocityDrop is an event-driven e-commerce system built to handle sudden flash-sale traffic without overselling inventory. It combines a FastAPI API gateway, Redis-backed search and inventory locks, RabbitMQ queueing, PostgreSQL persistence, and a Next.js frontend.
+VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-sale traffic spikes without ever overselling inventory. It combines a FastAPI API gateway, a Redis-backed in-memory Trie for instant product search, a RabbitMQ checkout queue, PostgreSQL for persistence, and a Next.js storefront + admin dashboard.
+
+---
 
 ## Architecture
 
-VelocityDrop separates the customer-facing request path from the final order-processing path:
+```
+Browser (Next.js)
+      │
+      ▼
+FastAPI Gateway  ──► Redis (Trie search cache + atomic inventory counters)
+      │
+      ▼
+RabbitMQ Queue
+      │
+      ▼
+Worker Process  ──► PostgreSQL (products, wallets, orders)
+```
 
-- **FastAPI API gateway** accepts search, checkout, wallet, and admin requests.
-- **Redis Trie search cache** provides fast product autocomplete and short-lived cached search results.
-- **RabbitMQ checkout queue** absorbs traffic spikes and lets checkout requests return quickly.
-- **Worker process** consumes checkout jobs, applies idempotency checks, validates wallets, and finalizes orders.
-- **Redis atomic inventory counters** prevent concurrent purchases from overdrawing stock.
-- **PostgreSQL** stores products, wallets, and completed or failed order records.
-- **Next.js frontend** provides the user-facing interface.
+| Component | Role |
+|---|---|
+| **FastAPI** | Accepts search, checkout, wallet, and admin requests |
+| **Redis Trie** | In-memory prefix search — returns results in < 1 ms |
+| **Redis Inventory Counter** | Atomic `DECRBY` prevents overselling under concurrency |
+| **RabbitMQ** | Decouples HTTP requests from database writes; absorbs traffic spikes |
+| **Worker** | Consumes queue messages, validates funds, finalizes orders |
+| **PostgreSQL** | Source of truth for products, wallets, and order history |
+| **Next.js** | Storefront (`/`) and admin dashboard (`/admin`) |
+
+---
 
 ## Tech Stack
 
-- **Backend:** Python, FastAPI, Pydantic, Uvicorn
-- **Worker:** Python, aio-pika
-- **Cache and locks:** Redis
+- **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic, SQLAlchemy
+- **Cache / Locks:** Redis
 - **Queue:** RabbitMQ
-- **Database:** PostgreSQL, SQLAlchemy
-- **Frontend:** Next.js, React
+- **Database:** PostgreSQL
+- **Frontend:** Next.js 16, React
 - **Load testing:** Locust
-- **Local infrastructure:** Docker Compose
+- **Local infra:** Docker Compose
+
+---
 
 ## Repository Layout
 
-```text
-velocityDrop/
-|-- main.py                 # FastAPI API gateway
-|-- worker.py               # RabbitMQ checkout worker
-|-- database.py             # SQLAlchemy models and database initialization
-|-- docker-compose.yml      # Redis, RabbitMQ, and PostgreSQL
-|-- locustfile.py           # Load-test scenarios
-|-- velocity-frontend/      # Next.js frontend
-|-- .gitignore
-|-- LICENSE
-`-- README.md
+```
+VelocityDrop/
+├── main.py                  # FastAPI API gateway + Trie search
+├── worker.py                # RabbitMQ checkout consumer
+├── database.py              # SQLAlchemy models & DB init
+├── locustfile.py            # Locust flash-sale load test
+├── docker-compose.yml       # Redis + RabbitMQ + PostgreSQL
+├── requirements.txt         # Python dependencies
+└── velocity-frontend/       # Next.js frontend
+    └── src/app/
+        ├── page.js          # Storefront (search + checkout)
+        └── admin/page.js    # Admin dashboard
 ```
 
-## Local Setup
+---
 
-### Prerequisites
+## Prerequisites
 
-- Docker and Docker Compose
-- Python 3.10+
-- Node.js 20+ recommended
+Make sure you have the following installed before starting:
 
-### 1. Clone the Repository
+| Tool | Version | Download |
+|---|---|---|
+| Docker Desktop | Latest | https://www.docker.com/products/docker-desktop |
+| Python | 3.10+ | https://www.python.org/downloads |
+| Node.js | 18+ | https://nodejs.org |
+
+---
+
+## Local Setup — Step by Step
+
+### Step 1 — Clone the repository
 
 ```bash
-git clone https://github.com/kasyapmittu/velocity-drop.git
-cd velocity-drop
+git clone https://github.com/vadde-kasyap/VelocityDrop.git
+cd VelocityDrop
 ```
 
-If you are working from the current local folder, the project root is the `velocityDrop` directory.
+---
 
-### 2. Start Redis, RabbitMQ, and PostgreSQL
+### Step 2 — Start infrastructure with Docker
+
+This starts Redis, RabbitMQ, and PostgreSQL in the background.
 
 ```bash
 docker-compose up -d
 ```
 
-Services started by Compose:
+Verify all three containers are running:
 
-- Redis: `localhost:6379`
-- RabbitMQ: `localhost:5672`
-- RabbitMQ dashboard: `http://localhost:15672` with `guest` / `guest`
-- PostgreSQL: `localhost:5432`
-- PostgreSQL database: `velocity_db`
+```bash
+docker ps
+```
 
-### 3. Create a Python Environment
+You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` all with status `Up`.
+
+| Service | URL |
+|---|---|
+| Redis | `localhost:6379` |
+| RabbitMQ AMQP | `localhost:5672` |
+| RabbitMQ Dashboard | http://localhost:15672 — login: `guest` / `guest` |
+| PostgreSQL | `localhost:5432` — db: `velocity_db`, user: `admin` |
+
+---
+
+### Step 3 — Set up the Python environment
 
 ```bash
 python -m venv venv
 ```
 
-On Windows PowerShell:
+Activate the virtual environment:
 
+**Windows (PowerShell):**
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-On macOS/Linux:
-
+**macOS / Linux:**
 ```bash
 source venv/bin/activate
 ```
 
-Install backend dependencies:
+Install all dependencies:
 
 ```bash
-pip install fastapi uvicorn redis aio-pika sqlalchemy psycopg2-binary pydantic locust
+pip install -r requirements.txt
 ```
 
-### 4. Run the FastAPI Backend
+---
 
-From the project root, start the server with hot-reloading enabled:
+### Step 4 — Run the FastAPI backend
 
-\`\`\`bash
+From the project root (with the venv active):
+
+```bash
 uvicorn main:app --reload
-\`\`\`
+```
 
-The API runs at:
+| URL | Description |
+|---|---|
+| http://127.0.0.1:8000 | API base |
+| http://127.0.0.1:8000/docs | Swagger interactive docs |
 
-- API: `http://127.0.0.1:8000`
-- Swagger docs: `http://127.0.0.1:8000/docs`
+The first startup automatically creates all database tables in PostgreSQL.
 
-### 5. Run the Checkout Worker
+---
 
-Open a second terminal from the project root and activate the same Python environment.
+### Step 5 — Run the checkout worker
+
+Open a **second terminal**, activate the same venv, and run:
 
 ```bash
 python worker.py
 ```
 
-The worker consumes messages from the `checkout_queue` RabbitMQ queue and writes final order outcomes to PostgreSQL.
+The worker listens on the `checkout_queue` RabbitMQ queue, processes orders, deducts wallet balances, and writes results to PostgreSQL.
 
-### 6. Run the Frontend
+---
 
-Open another terminal:
+### Step 6 — Run the frontend
+
+Open a **third terminal**:
 
 ```bash
 cd velocity-frontend
@@ -130,109 +176,136 @@ npm install
 npm run dev
 ```
 
-The frontend runs at `http://localhost:3000`.
+| URL | Description |
+|---|---|
+| http://localhost:3000 | Storefront (search + checkout) |
+| http://localhost:3000/admin | Admin dashboard |
 
-## API Overview
+> **WSL2 / VM users:** If you access the frontend from a non-localhost address (e.g. `172.x.x.x`), the `allowedDevOrigins` setting in `velocity-frontend/next.config.mjs` already includes the common WSL2 adapter IP. If your IP differs, add it there.
 
-### Search Products
+---
 
-```http
-GET /search?q=phone
-```
+### Step 7 — Seed data (required before testing)
 
-Returns autocomplete results from Redis cache when available, otherwise from the in-memory Trie.
+You must add at least one product and seed wallets before checkout will work.
 
-### Submit Checkout
+**Option A — Use the Admin Dashboard UI:**
+1. Go to http://localhost:3000/admin
+2. **Add Product** — enter a name, stock quantity, and price → click Save
+3. **Seed Data** — enter `2000` users → click Generate
 
-```http
-POST /checkout
-Idempotency-Key: unique-request-id
-Content-Type: application/json
-
-{
-  "user_id": "user_1",
-  "product_name": "iphone",
-  "quantity": 1
-}
-```
-
-Returns `202 Accepted` after queueing the checkout request.
-
-### Deposit Wallet Funds
-
-```http
-POST /wallet/deposit
-Content-Type: application/json
-
-{
-  "user_id": "user_1",
-  "amount": 1000
-}
-```
-
-### Add Product
-
-```http
-POST /admin/product
-Content-Type: application/json
-
-{
-  "name": "iphone",
-  "stock": 100,
-  "price": 799
-}
-```
-
-### Update Inventory
-
-```http
-PUT /admin/product/iphone?new_stock=250
-```
-
-### Seed Test Wallets
-
-```http
-POST /admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000
-```
-
-## Load Testing
-
-After the backend, worker, and Docker services are running:
+**Option B — Use the API directly:**
 
 ```bash
-locust -f locustfile.py
+# Add a product
+curl -X POST http://127.0.0.1:8000/admin/product \
+  -H "Content-Type: application/json" \
+  -d '{"name": "mac book m4", "stock": 500, "price": 1299.99}'
+
+# Seed 2000 user wallets with $500–$5000 each
+curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
 ```
 
-Then open `http://localhost:8089` and target `http://127.0.0.1:8000`.
+---
 
-Current performance goals:
+## Load Testing with Locust
 
-- Search latency target: under 50 ms
-- Checkout path: asynchronous queue acceptance under burst traffic
-- Inventory guarantee: no successful orders beyond available Redis-backed stock
+### Configure the product target
 
-### 7. Load Testing & Visualizing Queues (Locust + RabbitMQ)
-To prove the system's resilience under flash-sale conditions, you can simulate massive traffic spikes and watch the event-driven architecture absorb the load in real-time.
+Open [`locustfile.py`](locustfile.py) and set `target_products` to match a product you added in Step 7:
 
-**Step A: Open the RabbitMQ Management Dashboard**
-* Navigate to: `http://localhost:15672`
-* **Username:** `guest` | **Password:** `guest`
-* *What to watch:* Click on the **Queues** tab. Keep this open. When the load test starts, you will see the message queue spike instantly to absorb the traffic, protecting the PostgreSQL database from bottlenecks.
+```python
+target_products = [
+    "mac book m4"   # must already exist in the database
+]
+```
 
-**Step B: Start the Locust Load Tester**
-Open a new terminal, ensure your virtual environment is activated, and start the Locust server:
-\`\`\`bash
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-locust -f locustfile.py
-\`\`\`
+### Run Locust
 
-**Step C: Launch the Flash Sale Simulation**
-* Navigate to the Locust Web UI: `http://localhost:8089`
-* **Number of users:** Enter `1000` (Simulating 1,000 concurrent buyers)
-* **Spawn rate:** Enter `100` (Users added per second)
-* **Host:** `http://localhost:8000` (Your FastAPI backend)
-* Click **Start swarming**.
+**Windows (PowerShell — uses the venv directly):**
+```powershell
+.\venv\Scripts\locust.exe -f locustfile.py --host=http://127.0.0.1:8000
+```
 
-**Step D: Observe the System**
-* Watch the **Locust dashboard** to see the sub-50ms response times and the 0% failure rate.
-* Switch back to the **RabbitMQ dashboard** to watch the message broker seamlessly queue and process the checkout payloads while the atomic Redis locks prevent inventory overdraws.
+**macOS / Linux (with venv activated):**
+```bash
+locust -f locustfile.py --host=http://127.0.0.1:8000
+```
+
+Open the Locust Web UI at **http://localhost:8089** and enter:
+
+| Setting | Recommended |
+|---|---|
+| Number of users | `500` |
+| Ramp up (users/sec) | `50` |
+| Host | `http://127.0.0.1:8000` |
+
+Click **Start Swarming**.
+
+### What to watch
+
+- **Locust dashboard** — Real-time RPS, latency, and failure rate
+- **RabbitMQ dashboard** (http://localhost:15672 → Queues tab) — Watch the queue spike and drain as the worker processes orders
+- **Worker terminal** — See each `✅ SUCCESS` or `❌ FAILED` order log in real time
+
+---
+
+## API Reference
+
+### `GET /search?q={prefix}`
+Returns autocomplete suggestions from the in-memory Trie (Redis-cached for 60 s).
+
+### `POST /checkout`
+Queues a checkout request via RabbitMQ. Returns `202 Accepted` immediately.
+```json
+{ "user_id": "user_1", "product_name": "mac book m4", "quantity": 1 }
+```
+Include an `Idempotency-Key` header to prevent duplicate orders.
+
+### `POST /wallet/deposit`
+Credits a user's wallet.
+```json
+{ "user_id": "user_1", "amount": 1000 }
+```
+
+### `POST /admin/product`
+Adds a new product to Postgres, Trie, and Redis simultaneously.
+```json
+{ "name": "iphone 16", "stock": 200, "price": 999.99 }
+```
+
+### `PUT /admin/product/{name}?new_stock={n}`
+Updates stock in Postgres and Redis.
+
+### `POST /admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000`
+Bulk-generates test user wallets for load testing.
+
+---
+
+## How It Prevents Overselling
+
+1. A checkout request arrives and is immediately queued — no DB write yet.
+2. The worker dequeues it and runs an **idempotency check** in Redis. Duplicate requests are silently dropped.
+3. The worker **validates the user's wallet balance** against the product price.
+4. Only if funds are sufficient does it call `DECRBY` on the Redis inventory counter — an **atomic operation** that handles thousands of concurrent calls without race conditions.
+5. If the counter goes negative (stock exhausted), the worker **rolls back** the decrement and records a `failed_sold_out` order.
+6. On success, the wallet is debited and a `success` order is written to PostgreSQL.
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `locust` not found | Use `.\venv\Scripts\locust.exe` (Windows) or activate venv first |
+| `docker-compose` not found | Make sure Docker Desktop is running and you're inside the `VelocityDrop/` folder |
+| Search returns no results | Add at least one product via `/admin/product` first |
+| Checkout fails with "not found" | Ensure the product name in `locustfile.py` exactly matches what you added (it's stored lowercase) |
+| Frontend shows wrong data | Hard-refresh the browser (Ctrl+Shift+R) to clear any stale Next.js cache |
+| RabbitMQ connection error | Wait ~10 s after `docker-compose up` for RabbitMQ to finish initializing, then restart uvicorn |
+
+---
+
+## License
+
+MIT

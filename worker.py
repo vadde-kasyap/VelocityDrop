@@ -39,7 +39,7 @@ async def process_message(message: aio_pika.IncomingMessage):
 
             # 3. VERIFY FUNDS FIRST (Don't lock inventory if they can't pay!)
             if wallet.balance < total_cost:
-                print(f"❌ FAILED: {user_id} has Insufficient Funds. Need ${total_cost}, has ${wallet.balance}")
+                print(f"❌ FAILED: {user_id} has Insufficient Funds. Need ₹{round(total_cost, 2)}, has ₹{round(wallet.balance, 2)}")
                 
                 failed_order = Order(
                     user_id=user_id, product_name=product_name, quantity=quantity, status="failed_funds"
@@ -56,7 +56,9 @@ async def process_message(message: aio_pika.IncomingMessage):
 
             if stock_remaining >= 0:
                 # 5. SUCCESS! Deduct money and save the final order
-                wallet.balance -= total_cost
+                # BUG FIX: round to 2 decimal places to eliminate floating-point noise
+                # (e.g. 171.88999999999987 becomes 171.89)
+                wallet.balance = round(wallet.balance - total_cost, 2)
                 
                 new_order = Order(
                     user_id=user_id, product_name=product_name, quantity=quantity, status="success"
@@ -64,7 +66,7 @@ async def process_message(message: aio_pika.IncomingMessage):
                 db.add(new_order)
                 db.commit()
                 
-                print(f"✅ SUCCESS: {user_id} bought {quantity} {product_name}(s). Remaining Wallet: ${wallet.balance}. Stock left: {stock_remaining}")
+                print(f"✅ SUCCESS: {user_id} bought {quantity} {product_name}(s). Remaining Wallet: ₹{wallet.balance}. Stock left: {stock_remaining}")
                 redis_client.setex(redis_idem_key, 86400, "success")
                 
             else:

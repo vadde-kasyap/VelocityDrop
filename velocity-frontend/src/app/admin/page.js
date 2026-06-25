@@ -29,11 +29,16 @@ export default function AdminDashboard() {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: newName, stock: parseInt(newStock), price: parseFloat(newPrice) }),
       });
+      // BUG FIX: always parse the body — FastAPI errors arrive as { detail: "..." }
+      const data = await res.json();
       if (res.ok) {
-        addLog(`Product Added: ${newName}`);
+        addLog(`✅ Product Added: ${newName}`);
         setNewName("");
-      } else { addLog("Error creating product."); }
-    } catch { addLog("Network Error."); }
+      } else {
+        // res.ok is false for 4xx/5xx — show the actual server message
+        addLog(`❌ Error: ${data.detail || "Failed to create product."}`);
+      }
+    } catch { addLog("❌ Network Error."); }
     setLoading(false);
   };
 
@@ -43,11 +48,15 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const res = await fetch(`http://127.0.0.1:8000/admin/product/${updateName.toLowerCase()}?new_stock=${updateStock}`, { method: "PUT" });
+      // BUG FIX: always parse the body — FastAPI errors arrive as { detail: "..." }
+      const data = await res.json();
       if (res.ok) {
-        addLog(`Inventory Synced: ${updateName} to ${updateStock}`);
+        addLog(`✅ Inventory Synced: ${updateName} → ${updateStock} units`);
         setUpdateName("");
-      } else { addLog("Error updating inventory."); }
-    } catch { addLog("Network Error."); }
+      } else {
+        addLog(`❌ Error: ${data.detail || "Failed to update inventory."}`);
+      }
+    } catch { addLog("❌ Network Error."); }
     setLoading(false);
   };
 
@@ -116,8 +125,8 @@ export default function AdminDashboard() {
               <div className="space-y-4 text-sm">
                 <input type="number" value={numUsers} onChange={(e) => setNumUsers(e.target.value)} placeholder="Total Users" className="w-full bg-[#F5F5F7] border-none rounded-xl p-3 focus:ring-2 focus:ring-[#0071e3] transition-all outline-none" />
                 <div className="flex space-x-3">
-                  <input type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} placeholder="Min $" className="w-full bg-[#F5F5F7] border-none rounded-xl p-3 focus:ring-2 focus:ring-[#0071e3] transition-all outline-none" />
-                  <input type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="Max $" className="w-full bg-[#F5F5F7] border-none rounded-xl p-3 focus:ring-2 focus:ring-[#0071e3] transition-all outline-none" />
+                  <input type="number" value={minAmount} onChange={(e) => setMinAmount(e.target.value)} placeholder="Min ₹" className="w-full bg-[#F5F5F7] border-none rounded-xl p-3 focus:ring-2 focus:ring-[#0071e3] transition-all outline-none" />
+                  <input type="number" value={maxAmount} onChange={(e) => setMaxAmount(e.target.value)} placeholder="Max ₹" className="w-full bg-[#F5F5F7] border-none rounded-xl p-3 focus:ring-2 focus:ring-[#0071e3] transition-all outline-none" />
                 </div>
               </div>
             </div>
