@@ -211,7 +211,7 @@ Current performance goals:
 - Checkout path: asynchronous queue acceptance under burst traffic
 - Inventory guarantee: no successful orders beyond available Redis-backed stock
 
-### 6. Load Testing & Visualizing Queues (Locust + RabbitMQ)
+### 7. Load Testing & Visualizing Queues (Locust + RabbitMQ)
 To prove the system's resilience under flash-sale conditions, you can simulate massive traffic spikes and watch the event-driven architecture absorb the load in real-time.
 
 **Step A: Open the RabbitMQ Management Dashboard**
