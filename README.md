@@ -99,11 +99,11 @@ pip install fastapi uvicorn redis aio-pika sqlalchemy psycopg2-binary pydantic l
 
 ### 4. Run the FastAPI Backend
 
-From the project root:
+From the project root, start the server with hot-reloading enabled:
 
-```bash
-python main.py
-```
+\`\`\`bash
+uvicorn main:app --reload
+\`\`\`
 
 The API runs at:
 
