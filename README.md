@@ -23,7 +23,7 @@ To handle high concurrency without database locking or system crashes, this proj
 
 ## 📈 Performance & Load Testing 
 
-*Benchmarking is currently being conducted using [Locust / K6] to simulate concurrent flash-sale traffic. Metrics will be updated upon test completion.*
+*Benchmarking is currently being conducted using [Locust] to simulate concurrent flash-sale traffic. 
 
 *   **Target Search Latency:** < 50ms
 *   **Target Throughput:** [Placeholder] requests/sec
