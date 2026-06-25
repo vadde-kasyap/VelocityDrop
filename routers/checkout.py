@@ -19,16 +19,17 @@ async def process_checkout(request: Request, order: OrderRequest, idempotency_ke
         "status": "pending"
     }
 
-    channel = request.app.state.rabbitmq_channel
     message = aio_pika.Message(
         body=json.dumps(payload).encode(),
         delivery_mode=aio_pika.DeliveryMode.PERSISTENT 
     )
     
-    await channel.default_exchange.publish(
-        message,
-        routing_key="checkout_queue"
-    )
+    # Safely acquire a free channel from the pool, publish, and release it
+    async with request.app.state.mq_channel_pool.acquire() as channel:
+        await channel.default_exchange.publish(
+            message,
+            routing_key="checkout_queue"
+        )
 
     return {
         "status": "accepted",
