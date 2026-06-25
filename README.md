@@ -49,9 +49,15 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 
 ```
 VelocityDrop/
-├── main.py                  # FastAPI API gateway + Trie search
-├── worker.py                # RabbitMQ checkout consumer
+├── main.py                  # FastAPI entry point & startup events
+├── cache.py                 # Redis connection & custom Trie search logic
+├── schemas.py               # Pydantic data models for API requests
 ├── database.py              # SQLAlchemy models & DB init
+├── worker.py                # Multi-process RabbitMQ checkout consumer
+├── routers/                 # Modular API endpoints
+│   ├── search.py            # GET /search
+│   ├── checkout.py          # POST /checkout
+│   └── admin.py             # Admin and wallet routes
 ├── locustfile.py            # Locust flash-sale load test
 ├── docker-compose.yml       # Redis + RabbitMQ + PostgreSQL
 ├── requirements.txt         # Python dependencies
