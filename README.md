@@ -1,4 +1,4 @@
-# VelocityDrop
+﻿# VelocityDrop
 
 **High-concurrency flash-sale and distributed checkout engine.**
 
@@ -159,7 +159,7 @@ The first startup automatically creates all database tables in PostgreSQL.
 Open a **second terminal**, activate the same venv, and run:
 
 ```bash
-python worker.py
+$env:PYTHONUTF8=1; python worker.py  # Windows: forces UTF-8 so Rs and emoji display correctly
 ```
 
 The worker listens on the `checkout_queue` RabbitMQ queue, processes orders, deducts wallet balances, and writes results to PostgreSQL.

@@ -1,8 +1,12 @@
 import asyncio
+import sys
 import aio_pika
 import redis
 import json
 from database import SessionLocal, Order, Wallet, Product
+
+# Force UTF-8 output so the Rs symbol and emoji render correctly on Windows (cp1252) terminals
+sys.stdout.reconfigure(encoding='utf-8')
 
 redis_client = redis.Redis(host='localhost', port=6379, decode_responses=True)
 
@@ -35,11 +39,14 @@ async def process_message(message: aio_pika.IncomingMessage):
                 redis_client.setex(redis_idem_key, 86400, "failed_invalid_data")
                 return
 
-            total_cost = product.price * quantity
+            total_cost = round(product.price * quantity, 2)
 
             # 3. VERIFY FUNDS FIRST (Don't lock inventory if they can't pay!)
+            # Round the DB balance here so dirty legacy floats never surface in logs or comparisons
+            wallet.balance = round(wallet.balance, 2)
+
             if wallet.balance < total_cost:
-                print(f"❌ FAILED: {user_id} has Insufficient Funds. Need ₹{round(total_cost, 2)}, has ₹{round(wallet.balance, 2)}")
+                print(f"❌ FAILED: {user_id} has Insufficient Funds. Need ₹{total_cost}, has ₹{wallet.balance}")
                 
                 failed_order = Order(
                     user_id=user_id, product_name=product_name, quantity=quantity, status="failed_funds"
