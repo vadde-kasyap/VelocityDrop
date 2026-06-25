@@ -210,3 +210,29 @@ Current performance goals:
 - Search latency target: under 50 ms
 - Checkout path: asynchronous queue acceptance under burst traffic
 - Inventory guarantee: no successful orders beyond available Redis-backed stock
+
+### 6. Load Testing & Visualizing Queues (Locust + RabbitMQ)
+To prove the system's resilience under flash-sale conditions, you can simulate massive traffic spikes and watch the event-driven architecture absorb the load in real-time.
+
+**Step A: Open the RabbitMQ Management Dashboard**
+* Navigate to: `http://localhost:15672`
+* **Username:** `guest` | **Password:** `guest`
+* *What to watch:* Click on the **Queues** tab. Keep this open. When the load test starts, you will see the message queue spike instantly to absorb the traffic, protecting the PostgreSQL database from bottlenecks.
+
+**Step B: Start the Locust Load Tester**
+Open a new terminal, ensure your virtual environment is activated, and start the Locust server:
+\`\`\`bash
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+locust -f locustfile.py
+\`\`\`
+
+**Step C: Launch the Flash Sale Simulation**
+* Navigate to the Locust Web UI: `http://localhost:8089`
+* **Number of users:** Enter `1000` (Simulating 1,000 concurrent buyers)
+* **Spawn rate:** Enter `100` (Users added per second)
+* **Host:** `http://localhost:8000` (Your FastAPI backend)
+* Click **Start swarming**.
+
+**Step D: Observe the System**
+* Watch the **Locust dashboard** to see the sub-50ms response times and the 0% failure rate.
+* Switch back to the **RabbitMQ dashboard** to watch the message broker seamlessly queue and process the checkout payloads while the atomic Redis locks prevent inventory overdraws.
