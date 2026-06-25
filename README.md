@@ -24,7 +24,7 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 | Component | Role |
 |---|---|
 | **FastAPI** | Accepts search, checkout, wallet, and admin requests |
-| **Redis Trie** | In-memory prefix search — returns results in < 1 ms |
+| **Redis Trie** | In-memory prefix search — returns results in < 10 ms |
 | **Redis Inventory Counter** | Atomic `DECRBY` prevents overselling under concurrency |
 | **RabbitMQ** | Decouples HTTP requests from database writes; absorbs traffic spikes |
 | **Worker** | Consumes queue messages, validates funds, finalizes orders |
