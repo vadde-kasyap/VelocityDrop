@@ -188,6 +188,7 @@ npm run dev
 ### Step 7 — Seed data (required before testing)
 
 You must add at least one product and seed wallets before checkout will work.
+<img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/558e1f55-d726-46d6-a059-b1c00e5e482e" />
 
 **Option A — Use the Admin Dashboard UI:**
 1. Go to http://localhost:3000/admin
