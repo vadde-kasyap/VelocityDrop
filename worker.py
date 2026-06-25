@@ -5,6 +5,7 @@ import argparse
 import aio_pika
 import redis
 import json
+from sqlalchemy import text
 from database import SessionLocal, Order, Wallet, Product
 
 # Force UTF-8 output so Rs symbol and emoji render correctly on Windows terminals
@@ -37,22 +38,29 @@ def process_order(order_data: dict):
     db = SessionLocal()
 
     try:
-        # 2. Fetch wallet and product from Postgres
-        wallet  = db.query(Wallet).filter(Wallet.user_id == user_id).first()
+        # 2. Fetch product from Postgres
         product = db.query(Product).filter(Product.name == product_name).first()
 
-        if not wallet or not product:
-            print(f"❌ FAILED: '{user_id}' or '{product_name}' not found in database.")
+        if not product:
+            print(f"❌ FAILED: '{product_name}' not found in database.")
             redis_client.set(redis_idem_key, "failed_invalid_data", ex=86400)
             return
 
-        # Round immediately — eliminates dirty float values stored from older runs
-        total_cost     = round(product.price * quantity, 2)
-        wallet.balance = round(wallet.balance, 2)
+        total_cost = round(product.price * quantity, 2)
 
-        # 3. Funds check — before touching inventory
-        if wallet.balance < total_cost:
-            print(f"❌ INSUFFICIENT FUNDS: {user_id} needs ₹{total_cost}, has ₹{wallet.balance}")
+        # 3. ATOMIC Funds Deduction (Fixing the Wallet Race Condition)
+        # We UPDATE and check balance in a single atomic SQL transaction.
+        deduct_sql = text("""
+            UPDATE wallets 
+            SET balance = balance - :cost 
+            WHERE user_id = :uid AND balance >= :cost 
+            RETURNING balance
+        """)
+        
+        result = db.execute(deduct_sql, {"cost": total_cost, "uid": user_id}).fetchone()
+        
+        if not result:
+            print(f"❌ INSUFFICIENT FUNDS: {user_id} tried to buy {product_name}")
             db.add(Order(
                 user_id=user_id, product_name=product_name,
                 quantity=quantity, status="failed_funds"
@@ -60,28 +68,41 @@ def process_order(order_data: dict):
             db.commit()
             redis_client.set(redis_idem_key, "failed_funds", ex=86400)
             return
+            
+        new_balance = round(result[0], 2)
 
-        # 4. Atomic Redis inventory decrement — the overdraw guard
+        # 4. Atomic Redis inventory decrement
         inventory_key  = f"inventory:{product_name}"
         stock_remaining = redis_client.decrby(inventory_key, quantity)
 
         if stock_remaining >= 0:
-            # 5. SUCCESS — deduct wallet, persist order
-            wallet.balance = round(wallet.balance - total_cost, 2)
-            db.add(Order(
-                user_id=user_id, product_name=product_name,
-                quantity=quantity, status="success"
-            ))
-            db.commit()
-            print(
-                f"✅ SUCCESS: {user_id} × {quantity} {product_name} | "
-                f"Wallet: ₹{wallet.balance} | Stock left: {stock_remaining}"
-            )
-            redis_client.set(redis_idem_key, "success", ex=86400)
+            # 5. SUCCESS (Saga Pattern: Try/Except to prevent Orphaned Inventory)
+            try:
+                db.add(Order(
+                    user_id=user_id, product_name=product_name,
+                    quantity=quantity, status="success"
+                ))
+                db.commit()
+                print(
+                    f"✅ SUCCESS: {user_id} × {quantity} {product_name} | "
+                    f"Wallet: ₹{new_balance} | Stock left: {stock_remaining}"
+                )
+                redis_client.set(redis_idem_key, "success", ex=86400)
+            except Exception as e:
+                # 6. DISTRIBUTED ROLLBACK: If Postgres crashes exactly now, refund Redis!
+                db.rollback()
+                redis_client.incrby(inventory_key, quantity)
+                # We raise the exception so RabbitMQ does NOT ack the message, preventing order loss.
+                raise e
 
         else:
-            # 6. Overdraw rollback — stock hit zero between the check and decrement
+            # 7. Overdraw rollback — stock hit zero, refund Redis AND the Wallet
             redis_client.incrby(inventory_key, quantity)
+            
+            # Refund the wallet since we already deducted it in Step 3!
+            refund_sql = text("UPDATE wallets SET balance = balance + :cost WHERE user_id = :uid")
+            db.execute(refund_sql, {"cost": total_cost, "uid": user_id})
+            
             print(f"❌ SOLD OUT: {user_id} wanted {quantity} × {product_name}")
             db.add(Order(
                 user_id=user_id, product_name=product_name,
@@ -90,6 +111,9 @@ def process_order(order_data: dict):
             db.commit()
             redis_client.set(redis_idem_key, "failed_sold_out", ex=86400)
 
+    except Exception as outer_e:
+        # Pass the exception up so the message is not acked by RabbitMQ
+        raise outer_e
     finally:
         db.close()
 

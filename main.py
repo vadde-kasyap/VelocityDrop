@@ -4,7 +4,7 @@ import uvicorn
 import aio_pika
 
 from database import engine, Base, init_db, SessionLocal, Product
-from cache import search_trie, redis_client
+from cache import redis_client
 from routers import search, checkout, admin
 
 # 1. Automate Database Initialization
@@ -36,9 +36,10 @@ async def startup_event():
     db = SessionLocal()
     products = db.query(Product).all()
     
-    # 3. Build Trie and Redis from DB data
+    # 3. Build Redis Search Set and Inventory from DB data
     for p in products:
-        search_trie.insert(p.name.lower())
+        # ZADD adds the product name to a Sorted Set with a score of 0
+        redis_client.zadd("search_autocomplete", {p.name.lower(): 0})
         redis_client.set(f"inventory:{p.name.lower()}", p.stock)
         
     db.close()

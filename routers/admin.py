@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException
 import random
 from database import SessionLocal, Product, Wallet
 from schemas import DepositRequest, NewProductRequest
-from cache import search_trie, redis_client
+from cache import redis_client
 
 router = APIRouter()
 
@@ -58,11 +58,10 @@ async def add_new_product(product: NewProductRequest):
     db.commit()
     db.close()
     
-    search_trie.insert(product_name_clean)
+    # 3. Inject into High-Speed Caches (Stateless Redis)
+    # Insert into the Redis Sorted Set for autocomplete
+    redis_client.zadd("search_autocomplete", {product_name_clean: 0})
     redis_client.set(f"inventory:{product_name_clean}", product.stock)
-    
-    for i in range(1, len(product_name_clean) + 1):
-        redis_client.delete(f"search:{product_name_clean[:i]}")
     
     return {"status": "success", "message": f"Successfully added '{product.name}'."}
 

@@ -2,7 +2,7 @@
 
 **High-concurrency flash-sale and distributed checkout engine.**
 
-VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-sale traffic spikes without ever overselling inventory. It combines a FastAPI API gateway, a Redis-backed in-memory Trie for instant product search, a RabbitMQ checkout queue, PostgreSQL for persistence, and a Next.js storefront + admin dashboard.
+VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-sale traffic spikes without ever overselling inventory. It combines a FastAPI API gateway, a stateless Redis Lexicographical Search (Sorted Sets) for instant autocomplete, a RabbitMQ checkout queue, a distributed Saga-pattern worker pool, PostgreSQL for persistence, and a Next.js storefront + admin dashboard.
 
 ---
 
@@ -12,7 +12,7 @@ VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-
 Browser (Next.js)
       │
       ▼
-FastAPI Gateway  ──► Redis (Trie search cache + atomic inventory counters)
+FastAPI Gateway  ──► Redis (Stateless Lexicographical search + atomic inventory counters)
       │
       ▼
 RabbitMQ Queue
@@ -24,7 +24,7 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 | Component | Role |
 |---|---|
 | **FastAPI** | Accepts search, checkout, wallet, and admin requests |
-| **Redis Trie** | In-memory prefix search — returns results in < 10 ms |
+| **Redis Search** | Stateless Lexicographical Search (`ZRANGEBYLEX`) for autocomplete |
 | **Redis Inventory Counter** | Atomic `DECRBY` prevents overselling under concurrency |
 | **RabbitMQ** | Decouples HTTP requests from database writes; absorbs traffic spikes |
 | **Worker Pool** | Multi-process pool consuming queue messages, validating funds, and finalizing orders |
@@ -50,7 +50,7 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 ```
 VelocityDrop/
 ├── main.py                  # FastAPI entry point & startup events
-├── cache.py                 # Redis connection & custom Trie search logic
+├── cache.py                 # Redis connection setup
 ├── schemas.py               # Pydantic data models for API requests
 ├── database.py              # SQLAlchemy models & DB init
 ├── worker.py                # Multi-process RabbitMQ checkout consumer
