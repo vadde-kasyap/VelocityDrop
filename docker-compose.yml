@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------
+  # 1. In-Memory Cache & Lock Manager
+  # ----------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: velocity_redis
+    ports:
+      - "6379:6379"
+    # We enable basic persistence so your Trie doesn't vanish if the container restarts
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+  # ----------------------------------------
+  # 2. Event-Driven Message Broker
+  # ----------------------------------------
+  rabbitmq:
+    # Notice the "-management" tag. This includes the visual dashboard!
+    image: rabbitmq:3-management-alpine
+    container_name: velocity_rabbitmq
+    ports:
+      - "5672:5672"   # AMQP protocol port (Backend uses this)
+      - "15672:15672" # Management UI port (You use this to prove it works)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    restart: unless-stopped
+
+  # ----------------------------------------
+  # 3. Persistent Database
+  # ----------------------------------------
+  postgres:
+    image: postgres:15-alpine
+    container_name: velocity_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: velocity_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+# Named volumes ensure your data survives container restarts
+volumes:
+  redis_data:
+  rabbitmq_data:
+  postgres_data:
