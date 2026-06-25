@@ -145,12 +145,12 @@ def start_worker(worker_id: int, prefetch: int):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="VelocityDrop Checkout Worker")
     parser.add_argument(
-        "--workers",  type=int, default=4,
-        help="Number of worker processes to spawn (default: 4)"
+        "--workers",  type=int, default=2,
+        help="Number of worker processes to spawn (default: 2)"
     )
     parser.add_argument(
-        "--prefetch", type=int, default=10,
-        help="Concurrent messages each worker handles at once (default: 10)"
+        "--prefetch", type=int, default=5,
+        help="Concurrent messages each worker handles at once (default: 5)"
     )
     args = parser.parse_args()
 

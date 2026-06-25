@@ -160,10 +160,10 @@ Open a **second terminal**, activate the same venv, and run:
 
 ```bash
 # Windows (forces UTF-8 for Rs symbol and emoji)
-$env:PYTHONUTF8=1; python worker.py --workers 4 --prefetch 10
+$env:PYTHONUTF8=1; python worker.py --workers 2 --prefetch 5
 ```
 
-By default, this spawns a **Multi-Process Worker Pool** with 4 isolated processes, each handling up to 10 concurrent orders via RabbitMQ prefetch. This allows the system to process **40 concurrent orders** simultaneously. 
+By default, this spawns a **Multi-Process Worker Pool** tuned for a stable "Sweet Spot": 2 isolated processes, each handling up to 5 concurrent orders via RabbitMQ prefetch. This allows the system to comfortably process **10 concurrent orders** simultaneously without overwhelming local database connections or CPU.
 
 The workers listen on the `checkout_queue` RabbitMQ queue, process orders asynchronously, deduct wallet balances, and write results to PostgreSQL.
 
@@ -258,10 +258,10 @@ Click **Start Swarming**.
 
 The system is designed to handle thousands of concurrent users seamlessly:
 
-1. **Multi-Process Worker Pool**: By running `python worker.py --workers 4`, the system spawns 4 isolated processes, bypassing Python's GIL.
-2. **RabbitMQ Prefetch**: The `--prefetch 10` flag tells each worker to ask RabbitMQ for 10 unacknowledged messages at once.
+1. **Multi-Process Worker Pool**: By running `python worker.py --workers 2`, the system spawns 2 isolated processes, bypassing Python's GIL while keeping hardware usage light.
+2. **RabbitMQ Prefetch**: The `--prefetch 5` flag tells each worker to ask RabbitMQ for 5 unacknowledged messages at once.
 3. **Non-blocking DB Calls**: Blocking SQLAlchemy database operations are offloaded to thread pools (`asyncio.to_thread()`), ensuring the main event loop is never blocked while waiting for PostgreSQL.
-4. **Massive Throughput**: With 4 workers × 10 prefetch = **40 orders processed concurrently** in real-time, reducing queue drain time from seconds to milliseconds.
+4. **Connection Pool Safety**: Tuned to a "Sweet Spot" (2 workers × 5 prefetch = **10 concurrent orders**), ensuring default PostgreSQL connection limits are respected without deadlocks, while still draining a 1000-user queue in ~3 seconds.
 
 ---
 

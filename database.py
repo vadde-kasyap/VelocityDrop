@@ -4,7 +4,8 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Connects to the Postgres container running in Docker
 DATABASE_URL = "postgresql://admin:adminpassword@127.0.0.1:5432/velocity_db"
 
-engine = create_engine(DATABASE_URL)
+# Connection pooling tuned for high concurrency (up to 30 concurrent DB connections per process)
+engine = create_engine(DATABASE_URL, pool_size=20, max_overflow=10)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
