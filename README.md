@@ -6,20 +6,29 @@ VelocityDrop is an event-driven e-commerce backend built to handle sudden flash-
 
 ---
 
-## Architecture
+## 🏗️ Architecture
 
-\`\`\`text
-Browser (Next.js)
-      │
-      ▼
-FastAPI Gateway  ──► Redis (Stateless Lexicographical search + atomic inventory counters)
-      │
-      ▼
-RabbitMQ Queue
-      │
-      ▼
-Worker Process  ──► PostgreSQL (products, wallets, orders)
-\`\`\`
+<details>
+<summary><b>👁️ Click to view Architecture Diagram</b></summary>
+<br>
+
+```mermaid
+graph TD
+    Client("💻 Browser (Next.js)") -->|HTTP Requests| API["🚀 FastAPI Gateway"]
+    
+    API -->|1. Autocomplete (ZRANGEBYLEX)<br>2. Inventory Lock (DECRBY)| Redis[("⚡ Redis<br>(Search & Locks)")]
+    
+    API -->|Fire & Forget| MQ[["📬 RabbitMQ Queue"]]
+    
+    MQ -->|Consume Tickets| Worker["👷 Worker Processes (Saga Pattern)"]
+    
+    Worker -->|Saga Rollback (INCRBY)| Redis
+    Worker -->|Atomic UPDATE RETURNING| DB[("🗄️ PostgreSQL<br>(Products, Wallets, Orders)")]
+```
+
+</details>
+
+<br>
 
 | Component | Role |
 |---|---|
@@ -45,27 +54,27 @@ Worker Process  ──► PostgreSQL (products, wallets, orders)
 
 ---
 
-## Repository Layout
+## 📂 Repository Layout
 
-\`\`\`text
+```text
 VelocityDrop/
-├── main.py                  # FastAPI entry point & startup events
-├── cache.py                 # Redis connection setup
-├── schemas.py               # Pydantic data models for API requests
-├── database.py              # SQLAlchemy models & DB init
-├── worker.py                # Multi-process RabbitMQ checkout consumer
-├── routers/                 # Modular API endpoints
-│   ├── search.py            # GET /search
-│   ├── checkout.py          # POST /checkout
-│   └── admin.py             # Admin and wallet routes
-├── locustfile.py            # Locust flash-sale load test
-├── docker-compose.yml       # Redis + RabbitMQ + PostgreSQL
-├── requirements.txt         # Python dependencies
-└── velocity-frontend/       # Next.js frontend
-    └── src/app/
-        ├── page.js          # Storefront (search + checkout)
-        └── admin/page.js    # Admin dashboard
-\`\`\`
+├── 🚀 main.py                  # FastAPI entry point & startup events
+├── ⚡ cache.py                 # Redis connection setup
+├── 🛠️ schemas.py               # Pydantic data models for API requests
+├── 🗃️ database.py              # SQLAlchemy models & DB init
+├── 👷 worker.py                # Multi-process RabbitMQ checkout consumer
+├── 📁 routers/                 # Modular API endpoints
+│   ├── 🔍 search.py            # GET /search
+│   ├── 🛒 checkout.py          # POST /checkout
+│   └── 🔐 admin.py             # Admin and wallet routes
+├── 🧪 locustfile.py            # Locust flash-sale load test
+├── 🐳 docker-compose.yml       # Redis + RabbitMQ + PostgreSQL
+├── 📦 requirements.txt         # Python dependencies
+└── 🖥️ velocity-frontend/       # Next.js frontend
+    └── 📁 src/app/
+        ├── 🛍️ page.js          # Storefront (search + checkout)
+        └── 📊 admin/page.js    # Admin dashboard
+```
 
 ---
 
