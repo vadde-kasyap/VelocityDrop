@@ -42,15 +42,17 @@ graph TD
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
-- **Backend:** Python 3.10+, FastAPI, Uvicorn, Pydantic, SQLAlchemy
-- **Cache / Locks:** Redis
-- **Queue:** RabbitMQ
-- **Database:** PostgreSQL
-- **Frontend:** Next.js 16, React
-- **Load testing:** Locust
-- **Local infra:** Docker Compose
+| Layer | Technology |
+|---|---|
+| **Backend** | Python 3.10+, FastAPI, Uvicorn, Pydantic, SQLAlchemy |
+| **Cache / Locks** | Redis |
+| **Queue** | RabbitMQ |
+| **Database** | PostgreSQL |
+| **Frontend** | Next.js 16, React |
+| **Load Testing** | Locust |
+| **Local Infra** | Docker Compose |
 
 ---
 
@@ -78,42 +80,46 @@ VelocityDrop/
 
 ---
 
-## Prerequisites
+## ✅ Prerequisites
 
 Make sure you have the following installed before starting:
 
 | Tool | Version | Download |
 |---|---|---|
-| Docker Desktop | Latest | https://www.docker.com/products/docker-desktop |
-| Python | 3.10+ | https://www.python.org/downloads |
-| Node.js | 18+ | https://nodejs.org |
+| **Docker Desktop** | Latest | https://www.docker.com/products/docker-desktop |
+| **Python** | 3.10+ | https://www.python.org/downloads |
+| **Node.js** | 18+ | https://nodejs.org |
+
+> **⚠️ Windows users:** Make sure Docker Desktop is running before proceeding. You can verify by running `docker --version` in a terminal.
 
 ---
 
-## Local Setup — Step by Step
+## 🚀 Local Setup — Step by Step
 
 ### Step 1 — Clone the repository
 
-\`\`\`bash
+> Works the same on Windows, macOS, and Linux.
+
+```bash
 git clone https://github.com/vadde-kasyap/VelocityDrop.git
 cd VelocityDrop
-\`\`\`
+```
 
 ---
 
 ### Step 2 — Start infrastructure with Docker
 
-This starts Redis, RabbitMQ, and PostgreSQL in the background.
+This starts Redis, RabbitMQ, and PostgreSQL in the background. Works the same on all platforms.
 
-\`\`\`bash
+```bash
 docker-compose up -d
-\`\`\`
+```
 
 Verify all three containers are running:
 
-\`\`\`bash
+```bash
 docker ps
-\`\`\`
+```
 
 You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` all with status `Up`.
 
@@ -124,28 +130,47 @@ You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` al
 | RabbitMQ Dashboard | http://localhost:15672 — login: `guest` / `guest` |
 | PostgreSQL | `localhost:5432` — db: `velocity_db`, user: `admin` |
 
+> **⏱️ Note:** Wait about 10 seconds after `docker-compose up -d` before starting the API, to give RabbitMQ time to fully initialize.
+
 ---
 
-### Step 3 — Set up the Python environment
+### Step 3 — Set up the Python virtual environment
 
-Create the virtual environment:
+**Create the virtual environment** (same on all platforms):
+
 ```bash
 python -m venv venv
 ```
 
-Activate the virtual environment:
+**Activate it:**
 
-**Windows (PowerShell):**
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
 ```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-**macOS / Linux:**
+> If you get an execution policy error, first run:
+> ```powershell
+> Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+> ```
+
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
+
 ```bash
 source venv/bin/activate
 ```
 
-Install all dependencies:
+</details>
+
+<br>
+
+After activation, your prompt will show `(venv)`. Then install all dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
@@ -154,39 +179,75 @@ pip install -r requirements.txt
 
 ### Step 4 — Run the FastAPI backend
 
-From the project root (with the venv active):
+> Make sure your `(venv)` is active.
+
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
+```powershell
+$env:PYTHONUTF8=1; .\venv\Scripts\uvicorn.exe main:app --reload
+```
+
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
 
 ```bash
 uvicorn main:app --reload
 ```
 
+</details>
+
+<br>
+
 | URL | Description |
 |---|---|
 | http://127.0.0.1:8000 | API base |
-| http://127.0.0.1:8000/docs | Swagger interactive docs |
+| http://127.0.0.1:8000/docs | Swagger interactive docs (try all endpoints here!) |
 
-The first startup automatically creates all database tables in PostgreSQL.
+> **✅ First startup:** The server automatically creates all database tables in PostgreSQL on first boot.
 
 ---
 
 ### Step 5 — Run the checkout worker pool
 
-Open a **second terminal**, activate the same venv, and run the worker:
+Open a **second terminal**, activate the same `venv`, and run the worker:
 
-**Windows (PowerShell):**  
-*(Note: Windows needs `$env:PYTHONUTF8=1` to print the ₹ symbol and emojis correctly)*
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
 ```powershell
+.\venv\Scripts\Activate.ps1
 $env:PYTHONUTF8=1; python worker.py --workers 2 --prefetch 5
 ```
 
-**macOS / Linux:**
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
+
 ```bash
-PYTHONUTF8=1 python worker.py --workers 2 --prefetch 5
+source venv/bin/activate
+python worker.py --workers 2 --prefetch 5
 ```
 
-By default, this spawns a **Multi-Process Worker Pool** tuned for a stable "Sweet Spot": 2 isolated processes, each handling up to 5 concurrent orders via RabbitMQ prefetch. This allows the system to comfortably process **10 concurrent orders** simultaneously without overwhelming local database connections or CPU.
+</details>
 
-The workers listen on the `checkout_queue` RabbitMQ queue, process orders asynchronously, deduct wallet balances, and write results to PostgreSQL.
+<br>
+
+| Flag | Default | Description |
+|---|---|---|
+| `--workers` | `2` | Number of parallel OS processes |
+| `--prefetch` | `5` | Max unacknowledged RabbitMQ messages per worker |
+
+> **🧠 Sweet Spot:** `2 workers × 5 prefetch = 10 concurrent orders` — enough to drain a 1,000-user queue in ~3 seconds without overwhelming local DB connections.
+
+The workers will log every processed order in real time:
+```
+✅ SUCCESS: user_42 × 1 mac book m4 | Wallet: ₹1,234.56 | Stock left: 499
+❌ INSUFFICIENT FUNDS: user_99 needs ₹1,299.99, has ₹200.00
+```
 
 ---
 
@@ -194,11 +255,29 @@ The workers listen on the `checkout_queue` RabbitMQ queue, process orders asynch
 
 Open a **third terminal**:
 
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
+```powershell
+cd velocity-frontend
+npm install
+npm run dev
+```
+
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
+
 ```bash
 cd velocity-frontend
 npm install
 npm run dev
 ```
+
+</details>
+
+<br>
 
 | URL | Description |
 |---|---|
@@ -212,44 +291,55 @@ npm run dev
 ### Step 7 — Seed data (required before testing)
 
 You must add at least one product and seed wallets before checkout will work.
-<img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/558e1f55-d726-46d6-a059-b1c00e5e482e" />
+
+<img width="1364" height="635" alt="Admin Dashboard" src="https://github.com/user-attachments/assets/558e1f55-d726-46d6-a059-b1c00e5e482e" />
 
 **Option A — Use the Admin Dashboard UI:**
 1. Go to http://localhost:3000/admin
 2. **Add Product** — enter a name, stock quantity, and price → click Save
 3. **Seed Data** — enter `2000` users → click Generate
 
-**Option B — Use the API directly:**
+**Option B — Use the API directly (curl):**
 
-**Windows (PowerShell):**
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
 ```powershell
 # Add a product
-curl.exe -X POST http://127.0.0.1:8000/admin/product `
-  -H "Content-Type: application/json" `
-  -d '{"name": "mac book m4", "stock": 500, "price": 1299.99}'
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/product" `
+  -Method POST `
+  -ContentType "application/json" `
+  -Body '{"name": "mac book m4", "stock": 500, "price": 1299.99}'
 
-# Seed 2000 user wallets with $500–$5000 each
-curl.exe -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
+# Seed 2000 user wallets
+Invoke-RestMethod -Uri "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000" `
+  -Method POST
 ```
 
-**macOS / Linux:**
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
+
 ```bash
 # Add a product
 curl -X POST http://127.0.0.1:8000/admin/product \
   -H "Content-Type: application/json" \
   -d '{"name": "mac book m4", "stock": 500, "price": 1299.99}'
 
-# Seed 2000 user wallets with $500–$5000 each
+# Seed 2000 user wallets
 curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
 ```
 
+</details>
+
 ---
 
-## Load Testing with Locust
+## 🧪 Load Testing with Locust
 
-### Configure the product target
+### Step 1 — Configure the product target
 
-Open [`locustfile.py`](locustfile.py) and set `target_products` to match a product you added in Step 7:
+Open [`locustfile.py`](locustfile.py) and set `target_products` to match a product you added:
 
 ```python
 target_products = [
@@ -257,17 +347,27 @@ target_products = [
 ]
 ```
 
-### Run Locust
+### Step 2 — Run Locust
 
-**Windows (PowerShell):**
+<details>
+<summary><b>🪟 Windows (PowerShell)</b></summary>
+
 ```powershell
 .\venv\Scripts\locust.exe -f locustfile.py --host=http://127.0.0.1:8000
 ```
 
-**macOS / Linux:**
+</details>
+
+<details>
+<summary><b>🍎 macOS / Linux (Terminal)</b></summary>
+
 ```bash
 locust -f locustfile.py --host=http://127.0.0.1:8000
 ```
+
+</details>
+
+<br>
 
 Open the Locust Web UI at **http://localhost:8089** and enter:
 
@@ -282,19 +382,17 @@ Click **Start Swarming**.
 ### What to watch
 
 - **Locust dashboard** — Real-time RPS, latency, and failure rate
-- <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/77054f82-0ecb-4689-b6fb-950390a29ea3" />
+- <img width="1364" height="635" alt="Locust Dashboard" src="https://github.com/user-attachments/assets/77054f82-0ecb-4689-b6fb-950390a29ea3" />
 
 - **RabbitMQ dashboard** (http://localhost:15672 → Queues tab) — Watch the queue spike and drain as the worker processes orders
-- <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/7d50bddc-4c21-4117-b90a-62933f2ef971" />
-- <img width="1364" height="635" alt="image" src="https://github.com/user-attachments/assets/7d3bf39a-ddba-43db-aa1b-b7c37fff2ae9" />
-
-
+- <img width="1364" height="635" alt="RabbitMQ Queue Spike" src="https://github.com/user-attachments/assets/7d50bddc-4c21-4117-b90a-62933f2ef971" />
+- <img width="1364" height="635" alt="RabbitMQ Queue Drain" src="https://github.com/user-attachments/assets/7d3bf39a-ddba-43db-aa1b-b7c37fff2ae9" />
 
 - **Worker terminal** — See each `✅ SUCCESS` or `❌ FAILED` order log in real time
 
 ---
 
-## Scaling to High Concurrency
+## ⚡ Scaling to High Concurrency
 
 The system is designed to handle thousands of concurrent users seamlessly:
 
@@ -306,29 +404,34 @@ The system is designed to handle thousands of concurrent users seamlessly:
 
 ---
 
-## API Reference
+## 📖 API Reference
 
 ### `GET /search?q={prefix}`
 Returns autocomplete suggestions instantly using the stateless Redis Lexicographical Search (`ZRANGEBYLEX`).
 
+**Example response:**
+```json
+{ "source": "redis_zrangebylex", "results": ["mac book m4"] }
+```
+
 ### `POST /checkout`
 Queues a checkout request via RabbitMQ. Returns `202 Accepted` immediately.
-\`\`\`json
+```json
 { "user_id": "user_1", "product_name": "mac book m4", "quantity": 1 }
-\`\`\`
+```
 Include an `Idempotency-Key` header to prevent duplicate orders.
 
 ### `POST /wallet/deposit`
 Credits a user's wallet.
-\`\`\`json
+```json
 { "user_id": "user_1", "amount": 1000 }
-\`\`\`
+```
 
 ### `POST /admin/product`
 Adds a new product to Postgres and the Redis Lexicographical Set simultaneously.
-\`\`\`json
+```json
 { "name": "iphone 16", "stock": 200, "price": 999.99 }
-\`\`\`
+```
 
 ### `PUT /admin/product/{name}?new_stock={n}`
 Updates stock in Postgres and Redis.
@@ -338,30 +441,34 @@ Bulk-generates test user wallets for load testing.
 
 ---
 
-## How It Prevents Overselling
+## 🛡️ How It Prevents Overselling
 
 1. A checkout request arrives and is immediately queued — no DB write yet.
 2. The worker dequeues it and runs an **idempotency check** in Redis. Duplicate requests are silently dropped.
-3. The worker **validates the user's wallet balance** against the product price.
+3. The worker executes an **atomic SQL command** (`UPDATE wallets ... WHERE balance >= cost RETURNING balance`) — the balance check and deduction happen in one uninterruptible database operation, making wallet race conditions mathematically impossible.
 4. Only if funds are sufficient does it call `DECRBY` on the Redis inventory counter — an **atomic operation** that handles thousands of concurrent calls without race conditions.
-5. If the counter goes negative (stock exhausted), the worker **rolls back** the decrement and records a `failed_sold_out` order.
-6. On success, the wallet is debited and a `success` order is written to PostgreSQL.
+5. If the counter goes negative (stock exhausted), the worker **rolls back** the decrement (`INCRBY`) and records a `failed_sold_out` order.
+6. If the database commit fails at the very last second, the **Saga Pattern** kicks in — rolling back the Redis inventory *and* the wallet deduction, and requeuing the ticket so no order is ever lost.
 
 ---
 
-## Troubleshooting
+## 🐛 Troubleshooting
 
 | Problem | Fix |
 |---|---|
-| `locust` not found | Use `.\venv\Scripts\locust.exe` (Windows) or activate venv first |
+| `locust` not found | **Windows:** Use `.\venv\Scripts\locust.exe`. **Mac/Linux:** Run `source venv/bin/activate` first |
+| `uvicorn` not found | **Windows:** Use `.\venv\Scripts\uvicorn.exe`. **Mac/Linux:** Run `source venv/bin/activate` first |
 | `docker-compose` not found | Make sure Docker Desktop is running and you're inside the `VelocityDrop/` folder |
+| Unicode / emoji errors (Windows) | Set `$env:PYTHONUTF8=1` before running `python worker.py` |
+| PowerShell Activate.ps1 blocked | Run `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser` once |
 | Search returns no results | Add at least one product via `/admin/product` first |
-| Checkout fails with "not found" | Ensure the product name in `locustfile.py` exactly matches what you added (it's stored lowercase) |
-| Frontend shows wrong data | Hard-refresh the browser (Ctrl+Shift+R) to clear any stale Next.js cache |
-| RabbitMQ connection error | Wait ~10 s after `docker-compose up` for RabbitMQ to finish initializing, then restart uvicorn |
+| Checkout fails with "not found" | Ensure the product name in `locustfile.py` exactly matches what you added (stored lowercase) |
+| Frontend shows wrong data | Hard-refresh the browser (`Ctrl+Shift+R` on Windows, `Cmd+Shift+R` on Mac) |
+| RabbitMQ connection error | Wait ~10 s after `docker-compose up` for RabbitMQ to finish initializing, then restart the API server |
+| Worker shows negative wallet | This is expected — the Saga rollback catches it. Re-seed wallets with `/admin/seed-wallets` |
 
 ---
 
-## License
+## 📄 License
 
 MIT
