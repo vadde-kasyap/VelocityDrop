@@ -128,27 +128,27 @@ You should see `velocity_postgres`, `velocity_redis`, and `velocity_rabbitmq` al
 
 ### Step 3 — Set up the Python environment
 
-\`\`\`bash
+Create the virtual environment:
+```bash
 python -m venv venv
-\`\`\`
+```
 
 Activate the virtual environment:
 
 **Windows (PowerShell):**
-\`\`\`powershell
+```powershell
 .\venv\Scripts\Activate.ps1
-\`\`\`
+```
 
 **macOS / Linux:**
-\`\`\`bash
+```bash
 source venv/bin/activate
-\`\`\`
+```
 
 Install all dependencies:
-
-\`\`\`bash
+```bash
 pip install -r requirements.txt
-\`\`\`
+```
 
 ---
 
@@ -156,9 +156,9 @@ pip install -r requirements.txt
 
 From the project root (with the venv active):
 
-\`\`\`bash
+```bash
 uvicorn main:app --reload
-\`\`\`
+```
 
 | URL | Description |
 |---|---|
@@ -171,12 +171,18 @@ The first startup automatically creates all database tables in PostgreSQL.
 
 ### Step 5 — Run the checkout worker pool
 
-Open a **second terminal**, activate the same venv, and run:
+Open a **second terminal**, activate the same venv, and run the worker:
 
-\`\`\`bash
-# Windows (forces UTF-8 for Rs symbol and emoji)
+**Windows (PowerShell):**  
+*(Note: Windows needs `$env:PYTHONUTF8=1` to print the ₹ symbol and emojis correctly)*
+```powershell
 $env:PYTHONUTF8=1; python worker.py --workers 2 --prefetch 5
-\`\`\`
+```
+
+**macOS / Linux:**
+```bash
+PYTHONUTF8=1 python worker.py --workers 2 --prefetch 5
+```
 
 By default, this spawns a **Multi-Process Worker Pool** tuned for a stable "Sweet Spot": 2 isolated processes, each handling up to 5 concurrent orders via RabbitMQ prefetch. This allows the system to comfortably process **10 concurrent orders** simultaneously without overwhelming local database connections or CPU.
 
@@ -188,11 +194,11 @@ The workers listen on the `checkout_queue` RabbitMQ queue, process orders asynch
 
 Open a **third terminal**:
 
-\`\`\`bash
+```bash
 cd velocity-frontend
 npm install
 npm run dev
-\`\`\`
+```
 
 | URL | Description |
 |---|---|
@@ -215,7 +221,19 @@ You must add at least one product and seed wallets before checkout will work.
 
 **Option B — Use the API directly:**
 
-\`\`\`bash
+**Windows (PowerShell):**
+```powershell
+# Add a product
+curl.exe -X POST http://127.0.0.1:8000/admin/product `
+  -H "Content-Type: application/json" `
+  -d '{"name": "mac book m4", "stock": 500, "price": 1299.99}'
+
+# Seed 2000 user wallets with $500–$5000 each
+curl.exe -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
+```
+
+**macOS / Linux:**
+```bash
 # Add a product
 curl -X POST http://127.0.0.1:8000/admin/product \
   -H "Content-Type: application/json" \
@@ -223,7 +241,7 @@ curl -X POST http://127.0.0.1:8000/admin/product \
 
 # Seed 2000 user wallets with $500–$5000 each
 curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount=500&max_amount=5000"
-\`\`\`
+```
 
 ---
 
@@ -233,23 +251,23 @@ curl -X POST "http://127.0.0.1:8000/admin/seed-wallets?num_users=2000&min_amount
 
 Open [`locustfile.py`](locustfile.py) and set `target_products` to match a product you added in Step 7:
 
-\`\`\`python
+```python
 target_products = [
     "mac book m4"   # must already exist in the database
 ]
-\`\`\`
+```
 
 ### Run Locust
 
-**Windows (PowerShell — uses the venv directly):**
-\`\`\`powershell
+**Windows (PowerShell):**
+```powershell
 .\venv\Scripts\locust.exe -f locustfile.py --host=http://127.0.0.1:8000
-\`\`\`
+```
 
-**macOS / Linux (with venv activated):**
-\`\`\`bash
+**macOS / Linux:**
+```bash
 locust -f locustfile.py --host=http://127.0.0.1:8000
-\`\`\`
+```
 
 Open the Locust Web UI at **http://localhost:8089** and enter:
 
